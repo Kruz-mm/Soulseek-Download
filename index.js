@@ -229,7 +229,7 @@ bot.callbackQuery(/^dl_(\d+)_(\d+)$/, async (ctx) => {
 
             const picture = metadata.common.picture?.[0];
             if (picture) {
-                thumbnail = `${tempPath}.jpg`;
+                thumbPath = `${tempPath}.jpg`;
                 fs.writeFileSync(thumbPath, picture.data);
                 thumbnail = new InputFile(thumbPath);
             }
