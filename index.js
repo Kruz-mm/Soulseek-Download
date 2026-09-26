@@ -52,7 +52,7 @@ function sizeLabel(bytes) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
-function guessArtistTitle(filename) {
+function guessArtistTitle(fileName) {
     const clean = fileName.replace(/\.[^/.]+$/, "");
     const match = clean.match(/^(.+?)\s*-\s*(.+)$/);
     return match
