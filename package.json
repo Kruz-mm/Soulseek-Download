@@ -1,0 +1,16 @@
+{
+  "name": "soulseek",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "dependencies": {
+    "dotenv": "^18.0.4",
+    "grammy": "^1.46.0",
+    "slsk-client": "^2.0.2"
+  }
+}
