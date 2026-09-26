@@ -1,4 +1,5 @@
 import { Bot, InlineKeyboard, InputFile } from "grammy";
+import { run } from "@grammyjs/runner";
 import "dotenv/config";
 import { SlskClient } from "slsk-client";
 import fs from "fs";
@@ -8,6 +9,7 @@ import os from "os";
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // ограничение на скачивание — 50 МБ
 const SEARCH_TIMEOUT = 12000;
 const MAX_RESULTS = 5;
+const STALL_TIMEOUT = 25000;
 
 const EXTENSIONS = {
     flac: /\.flac$/i,
@@ -172,13 +174,22 @@ bot.callbackQuery(/^dl_(\d+)_(\d+)$/, async (ctx) => {
 
     let lastPercent = -1;
     let lastEditTime = 0;
+    let stallTimer;
 
     try {
         const download = client.download({ ...file, path: tempPath });
         activeDownloads.set(downloadId, download);
 
+        stallTimer = setTimeout(() => download.cancel(), STALL_TIMEOUT);
+        const resetStallTimer = () => {
+            clearTimeout(stallTimer);
+            stallTimer = setTimeout(() => download.cancel(), STALL_TIMEOUT);
+        };
+
         // обновляем сообщение с прогрессом, но не чаще раза в 3 секунды
         download.on("progress", ({ progress }) => {
+            resetStallTimer();
+
             const percent = Math.round((progress ?? 0) * 100);
             const now = Date.now();
             if (percent === lastPercent || now - lastEditTime < 3000) return;
@@ -217,6 +228,7 @@ bot.callbackQuery(/^dl_(\d+)_(\d+)$/, async (ctx) => {
             )
             .catch(() => {});
     } finally {
+        clearTimeout(stallTimer);
         activeDownloads.delete(downloadId);
         if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
         searchResults.delete(searchId);
@@ -224,4 +236,4 @@ bot.callbackQuery(/^dl_(\d+)_(\d+)$/, async (ctx) => {
 });
 
 console.log("Бот запущен");
-bot.start();
+run(bot);
