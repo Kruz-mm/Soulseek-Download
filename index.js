@@ -1,5 +1,6 @@
 import { Bot, InlineKeyboard, InputFile } from "grammy";
 import { run } from "@grammyjs/runner";
+import { parseFile } from "music-metadata";
 import "dotenv/config";
 import { SlskClient } from "slsk-client";
 import fs from "fs";
@@ -49,6 +50,14 @@ bot.command("start", (ctx) =>
 
 function sizeLabel(bytes) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+}
+
+function guessArtistTitle(filename) {
+    const clean = fileName.replace(/\.[^/.]+$/, "");
+    const match = clean.match(/^(.+?)\s*-\s*(.+)$/);
+    return match
+        ? { artist: match[1].trim(), title: match[2].trim() }
+        : { artist: null, title: clean };
 }
 
 // текстовый прогресс-бар для сообщений о скачивании
@@ -175,6 +184,7 @@ bot.callbackQuery(/^dl_(\d+)_(\d+)$/, async (ctx) => {
     let lastPercent = -1;
     let lastEditTime = 0;
     let stallTimer;
+    let thumbPath;
 
     try {
         const download = client.download({ ...file, path: tempPath });
@@ -208,12 +218,30 @@ bot.callbackQuery(/^dl_(\d+)_(\d+)$/, async (ctx) => {
 
         await download;
 
-        await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, "Отправляю файл...");
-        await ctx.replyWithAudio(new InputFile(tempPath), {
-            title: safeName.replace(/\.[^/.]+$/, ""),
-            performer: file.user
-        });
+        let performer = file.user;
+        let title = safeName.replace(/\.[^/.]+$/, "");
+        let thumbnail;
+
+        try {
+            const metadata = await parseFile(tempPath);
+            if (metadata.common.artist) performer = metadata.common.artist;
+            if (metadata.common.title) title = metadata.common.title;
+
+            const picture = metadata.common.picture?.[0];
+            if (picture) {
+                thumbnail = `${tempPath}.jpg`;
+                fs.writeFileSync(thumbPath, picture.data);
+                thumbnail = new InputFile(thumbPath);
+            }
+        } catch {
+            const guess = guessArtistTitle(rawname);
+            if (guess.artist) performer = guess.artist;
+            title = guess.title;
+        }
+
+        await ctx.replyWithAudio(new InputFile(tempPath), { title, performer, thumbnail });
         await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id).catch(() => {});
+
     } catch (err) {
         const cancelled = err.name === "DownloadCancelledError";
         if (!cancelled) console.error("Ошибка скачивания:", err);
@@ -231,6 +259,7 @@ bot.callbackQuery(/^dl_(\d+)_(\d+)$/, async (ctx) => {
         clearTimeout(stallTimer);
         activeDownloads.delete(downloadId);
         if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        if (thumbPath && fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
         searchResults.delete(searchId);
     }
 });
