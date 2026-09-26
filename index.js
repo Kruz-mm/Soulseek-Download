@@ -234,7 +234,7 @@ bot.callbackQuery(/^dl_(\d+)_(\d+)$/, async (ctx) => {
                 thumbnail = new InputFile(thumbPath);
             }
         } catch {
-            const guess = guessArtistTitle(rawname);
+            const guess = guessArtistTitle(rawName);
             if (guess.artist) performer = guess.artist;
             title = guess.title;
         }
